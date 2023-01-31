@@ -73,7 +73,6 @@ async function updateCourse(course, dueDates, token) {
     }
 
     console.log(`Couldn't find lesson for ${name}`);
-
   }
 }
 
@@ -91,32 +90,9 @@ async function loadDueDates() {
 }
 
 async function main() {
-  // TODO: test expired token
-  // TODO: Get token from user
-
   var dueDates = await loadDueDates();
 
-  // const r = await fetch("https://us.edstem.org/api/lessons/53148", {
-  //   "headers": {
-  //     "accept": "*/*",
-  //     "accept-language": "en-US,en;q=0.9",
-  //     "content-type": "application/json",
-  //     "sec-ch-ua": "\"Not_A Brand\";v=\"99\", \"Google Chrome\";v=\"109\", \"Chromium\";v=\"109\"",
-  //     "sec-ch-ua-mobile": "?0",
-  //     "sec-ch-ua-platform": "\"macOS\"",
-  //     "sec-fetch-dest": "empty",
-  //     "sec-fetch-mode": "cors",
-  //     "sec-fetch-site": "same-site",
-  //     "x-token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXBlIjoidG9rZW4iLCJ1c2VyX2lkIjoyMDkwMzQsInNlc3Npb25faWQiOjY1MzMyNTAzLCJyZWdpb24iOiIiLCJpYXQiOjE2NzUxNzU0NjUsImV4cCI6MTY3NjM4NTA2NX0.5uq4S8SPmxUCjWu9GlcvVSVTlxB5Vre9GC_tewLVOH8"
-  //   },
-  //   "referrerPolicy": "same-origin",
-  //   "body": "{\"lesson\":{\"id\":53148,\"module_id\":12071,\"type\":\"java\",\"title\":\"Comp 311 HW 1\",\"index\":1,\"outline\":\"\",\"is_hidden\":false,\"is_unlisted\":false,\"password\":\"\",\"tutorial_regex\":\"\",\"is_timed\":false,\"timer_duration\":60,\"timer_expiration_access\":false,\"state\":\"active\",\"openable\":false,\"release_quiz_solutions\":false,\"release_quiz_correctness_only\":false,\"release_challenge_feedback\":false,\"release_challenge_solutions\":false,\"release_challenge_feedback_while_active\":false,\"release_challenge_solutions_while_active\":false,\"reopen_submissions\":false,\"late_submissions\":true,\"available_at\":null,\"locked_at\":null,\"solutions_at\":null,\"due_at\":\"2023-02-02T04:57:00.000Z\",\"settings\":{\"quiz_question_number_style\":\"\",\"quiz_mode\":\"hide-solution-until-correct\",\"quiz_active_status\":\"active\"},\"prerequisites\":[]}}",
-  //   "method": "PUT",
-  //   "mode": "cors",
-  //   "credentials": "omit"
-  // });
-
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXBlIjoidG9rZW4iLCJ1c2VyX2lkIjoyMDkwMzQsInNlc3Npb25faWQiOjY1MzMyNTAzLCJyZWdpb24iOiIiLCJpYXQiOjE2NzUxNzU0NjUsImV4cCI6MTY3NjM4NTA2NX0.5uq4S8SPmxUCjWu9GlcvVSVTlxB5Vre9GC_tewLVOH8";
+  const token = prompt("Enter ed token (x-token header): ");
   var courses = await getCourses(token);
   courses = courses.filter(
     ({course}) => (
