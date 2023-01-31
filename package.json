@@ -1,0 +1,10 @@
+{
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.0",
+    "prompt-sync": "^4.2.0"
+  },
+  "scripts": {
+    "start": "node set-dates.js"
+  }
+}
