@@ -15,6 +15,18 @@ async function getCourses(token) {
     return data.courses;
 }
 
+function makePassword(length) {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+}
+
 async function updateCourse(course, dueDates, token) {
   var assignments;
   for (const [n, a] of Object.entries(dueDates)) {
@@ -49,6 +61,14 @@ async function updateCourse(course, dueDates, token) {
         const dueDate = new Date(hw1DueDate);
         dueDate.setDate(dueDate.getDate() + days);
         lesson.due_at = dueDate;
+        lesson.release_challenge_feedback_while_active = true;
+
+        if (lesson.title.includes("Exam")) {
+          lesson.is_timed = true;
+          lesson.timer_duration = 180;
+          lesson.timer_expiration_access = false;
+          lesson.password = makePassword(8);
+        }
 
         const fields = ["id","module_id","type","title","index","outline","is_hidden","is_unlisted","password","tutorial_regex","is_timed","timer_duration","timer_expiration_access","state","openable","release_quiz_solutions","release_quiz_correctness_only","release_challenge_feedback","release_challenge_solutions","release_challenge_feedback_while_active","release_challenge_solutions_while_active","reopen_submissions","late_submissions","available_at","locked_at","solutions_at","due_at","settings","prerequisites"];
         const filteredLesson = fields.reduce((acc, cur) => Object.assign(acc, { [cur]: lesson[cur] }), {});
