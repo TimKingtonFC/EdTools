@@ -61,7 +61,8 @@ async function updateCourse(course, dueDates, token) {
         const dueDate = new Date(hw1DueDate);
         dueDate.setDate(dueDate.getDate() + days);
         lesson.due_at = dueDate;
-        lesson.release_challenge_feedback_while_active = true;
+        lesson.release_feedback = true;
+        lesson.release_feedback_while_active = true;
 
         if (lesson.title.includes("Exam")) {
           lesson.is_timed = true;
@@ -70,7 +71,37 @@ async function updateCourse(course, dueDates, token) {
           lesson.password = makePassword(8);
         }
 
-        const fields = ["id","module_id","type","title","index","outline","is_hidden","is_unlisted","password","tutorial_regex","is_timed","timer_duration","timer_expiration_access","state","openable","release_quiz_solutions","release_quiz_correctness_only","release_challenge_feedback","release_challenge_solutions","release_challenge_feedback_while_active","release_challenge_solutions_while_active","reopen_submissions","late_submissions","available_at","locked_at","solutions_at","due_at","settings","prerequisites"];
+        const fields = [
+          "id",
+          "module_id",
+          "type",
+          "title",
+          "index",
+          "outline",
+          "is_hidden",
+          "is_unlisted",
+          "password",
+          "tutorial_regex",
+          "is_timed",
+          "timer_duration",
+          "timer_expiration_access",
+          "state",
+          "openable",
+          "release_quiz_solutions",
+          "release_quiz_correctness_only",
+          "release_feedback",
+          "release_challenge_solutions",
+          "release_feedback_while_active",
+          "release_challenge_solutions_while_active",
+          "reopen_submissions",
+          "late_submissions",
+          "available_at",
+          "locked_at",
+          "solutions_at",
+          "due_at",
+          "settings",
+          "prerequisites"
+        ];
         const filteredLesson = fields.reduce((acc, cur) => Object.assign(acc, { [cur]: lesson[cur] }), {});
 
         const body = JSON.stringify({lesson: filteredLesson});
@@ -109,11 +140,32 @@ async function loadDueDates() {
   return dueDates;
 }
 
+async function loadEdToken() {
+  let token;
+  try {
+    token = await fs.readFile(`edtoken.txt`);
+  }
+  catch {
+  }
+
+  while (true) {
+    if (token) {
+      var courses = await getCourses(token);
+      if (courses) {
+        await fs.writeFile(`edtoken.txt`, token);
+        return token;
+      }
+    }
+
+    token = prompt("Enter ed token (x-token header): ");
+  }
+}
+
 async function main() {
   var dueDates = await loadDueDates();
+  var edToken = await loadEdToken();
 
-  const token = prompt("Enter ed token (x-token header): ");
-  var courses = await getCourses(token);
+  var courses = await getCourses(edToken);
   courses = courses.filter(
     ({course}) => (
       course.status !== "archived" &&
@@ -127,7 +179,7 @@ async function main() {
 
   var n = prompt('Course to update?');
 
-  updateCourse(courses[n], dueDates, token);
+  updateCourse(courses[n], dueDates, edToken);
 }
 
 main();

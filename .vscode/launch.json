@@ -13,6 +13,7 @@
             ],
             "program": "${workspaceFolder}/set-dates.js",
             "runtimeExecutable": "node",
+            "console": "integratedTerminal"
         }
     ]
 }
