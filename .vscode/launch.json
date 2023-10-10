@@ -11,9 +11,11 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/set-dates.js",
+            "program": "${workspaceFolder}/out/main.js",
             "runtimeExecutable": "node",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "preLaunchTask": "tsc: build - tsconfig.json",
+            "outFiles": ["${workspaceFolder}/out/**/*.js"]
         }
     ]
 }

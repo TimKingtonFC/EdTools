@@ -1,10 +1,19 @@
 {
   "type": "module",
+  "main": "out/index.js",
   "dependencies": {
     "node-fetch": "^3.3.0",
     "prompt-sync": "^4.2.0"
   },
   "scripts": {
-    "start": "node set-dates.js"
+    "start": "node main.js",
+    "compile": "tsc --declaration",
+    "lint": "tslint --project tsconfig.json",
+    "prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/prompt-sync": "^4.2.1",
+    "ts-node": "^10.9.1"
   }
 }
