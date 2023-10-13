@@ -1,17 +1,19 @@
 {
-  "HW 1": 0,
-  "HW 2": 7,
-  "HW 3": 14,
-  "HW 4": 21,
-  "HW 5": 28,
-  "HW 6": 35,
-  "HW 7": 42,
-  "HW 8": 49,
-  "HW 9": 56,
-  "HW 10": 63,
-  "Lab 1": 14,
-  "Lab 2": 28,
-  "Lab 3": 49,
-  "Lab 4": 63,
-  "Lab 5": 76
+  "assignments": [
+    { "name": "HW 1", "dueOffset": 0 },
+    { "name": "HW 2", "dueOffset": 7 },
+    { "name": "HW 3", "dueOffset": 14 },
+    { "name": "HW 4", "dueOffset": 21 },
+    { "name": "HW 5", "dueOffset": 28 },
+    { "name": "HW 6", "dueOffset": 35 },
+    { "name": "HW 7", "dueOffset": 42 },
+    { "name": "HW 8", "dueOffset": 49 },
+    { "name": "HW 9", "dueOffset": 56 },
+    { "name": "HW 10", "dueOffset": 63 },
+    { "name": "Lab 1", "dueOffset": 14 },
+    { "name": "Lab 2", "dueOffset": 28 },
+    { "name": "Lab 3", "dueOffset": 49 },
+    { "name": "Lab 4", "dueOffset": 63 },
+    { "name": "Lab 5", "dueOffset": 76 }
+  ]
 }
