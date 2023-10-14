@@ -4,5 +4,6 @@ npm-debug.log
 .nyc
 .env
 .DS_Store
+canvastoken.txt
 edtoken.txt
 out

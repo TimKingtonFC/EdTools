@@ -1,19 +1,19 @@
 {
   "assignments": [
-    { "name": "HW 1", "dueOffset": 0 },
-    { "name": "HW 2", "dueOffset": 7 },
-    { "name": "HW 3", "dueOffset": 14 },
-    { "name": "HW 4", "dueOffset": 21 },
-    { "name": "HW 5", "dueOffset": 28 },
-    { "name": "HW 6", "dueOffset": 35 },
-    { "name": "HW 7", "dueOffset": 42 },
-    { "name": "HW 8", "dueOffset": 49 },
-    { "name": "HW 9", "dueOffset": 56 },
-    { "name": "HW 10", "dueOffset": 63 },
-    { "name": "Lab 1", "dueOffset": 14 },
-    { "name": "Lab 2", "dueOffset": 28 },
-    { "name": "Lab 3", "dueOffset": 49 },
-    { "name": "Lab 4", "dueOffset": 63 },
-    { "name": "Lab 5", "dueOffset": 76 }
+    { "edNameSuffix": "HW 1", "dueOffset": 0, "canvasNamePrefix": "Homework 1:" },
+    { "edNameSuffix": "HW 2", "dueOffset": 7, "canvasNamePrefix": "Homework 2" },
+    { "edNameSuffix": "HW 3", "dueOffset": 14, "canvasNamePrefix": "Homework 3" },
+    { "edNameSuffix": "HW 4", "dueOffset": 21, "canvasNamePrefix": "Homework 4" },
+    { "edNameSuffix": "HW 5", "dueOffset": 28, "canvasNamePrefix": "Homework 5" },
+    { "edNameSuffix": "HW 6", "dueOffset": 35, "canvasNamePrefix": "Homework 6" },
+    { "edNameSuffix": "HW 7", "dueOffset": 42, "canvasNamePrefix": "Homework 7" },
+    { "edNameSuffix": "HW 8", "dueOffset": 49, "canvasNamePrefix": "Homework 8" },
+    { "edNameSuffix": "HW 9", "dueOffset": 56, "canvasNamePrefix": "Homework 9" },
+    { "edNameSuffix": "HW 10", "dueOffset": 63, "canvasNamePrefix": "Homework 10" },
+    { "edNameSuffix": "Lab 1", "dueOffset": 14, "canvasNamePrefix": "Lab 1" },
+    { "edNameSuffix": "Lab 2", "dueOffset": 28, "canvasNamePrefix": "Lab 2" },
+    { "edNameSuffix": "Lab 3", "dueOffset": 49, "canvasNamePrefix": "Lab 3" },
+    { "edNameSuffix": "Lab 4", "dueOffset": 63, "canvasNamePrefix": "Lab 4" },
+    { "edNameSuffix": "Lab 5", "dueOffset": 76, "canvasNamePrefix": "Lab 5" }
   ]
 }
