@@ -8,7 +8,7 @@
     "prompt-sync": "^4.2.0"
   },
   "scripts": {
-    "start": "node main.js",
+    "start": "node out/main.js",
     "compile": "tsc --declaration",
     "lint": "tslint --project tsconfig.json",
     "prepublish": "npm run compile"

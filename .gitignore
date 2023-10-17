@@ -6,4 +6,6 @@ npm-debug.log
 .DS_Store
 canvastoken.txt
 edtoken.txt
+openaikey.txt
+questions.txt
 out

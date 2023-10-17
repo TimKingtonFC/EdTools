@@ -1,6 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { promises as fs } from "fs";
 import fetch from "node-fetch";
+import OpenAI from "openai";
 import { homedir } from "os";
 import { join } from "path";
 import promptSync from "prompt-sync";
@@ -29,6 +30,7 @@ interface AssignmentSettings {
 
 let edToken: string;
 let canvasToken: string;
+let openAIKey: string;
 
 function makePassword(length: number): string {
   let result = "";
@@ -126,7 +128,7 @@ function chooseAssignment(courseSettings: CourseSettings): AssignmentSettings {
   return courseSettings.assignments[n];
 }
 
-async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse) {
+async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse): Promise<void> {
   let assignmentSettings = chooseAssignment(courseSettings);
 
   let edLessons = await getEdLessons(edToken, edCourse);
@@ -146,8 +148,39 @@ async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse) 
 
   let qid = question.id;
   let answers = results.responses.filter((r) => r.question_id === qid);
-  for (let a of answers) {
-    console.log(`${a.user_id}:${a.data}`);
+
+  const openai = new OpenAI({
+    apiKey: openAIKey,
+  });
+
+  let studentQuestions = "";
+  for (let answer of answers) {
+    console.log(`Processing reflection for ${answer.user_name}`);
+
+    let chatCompletion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "user",
+          content: "Please find any questions in the following text and list them.  Here is the text: " + answer.data,
+        },
+      ],
+      model: "gpt-4",
+    });
+
+    let response: string | undefined | null = chatCompletion.choices[0].message.content;
+    console.log(response);
+    if (response?.includes("does not contain any questions")) {
+      console.log("No questions found");
+      studentQuestions += ` ${answer.user_name}'s reflection has no questions: ` + answer.data + " ";
+    }
+
+    let wc = answer.data.split(" ").length;
+    if (wc < 120) {
+      console.log("The reflection is too short:", wc);
+      studentQuestions += ` ${answer.user_name}'s reflection is too short: ` + wc + " " + answer.data + " ";
+    }
+    studentQuestions += response + " ";
+    await fs.writeFile("questions.txt", studentQuestions);
   }
 }
 
@@ -275,9 +308,15 @@ async function loadEdToken() {
 }
 
 async function loadCanvasToken() {
+  console.log("loading token");
   canvasToken = await loadToken("canvastoken.txt", "Enter canvas token (Authorization header): ", (token: string) =>
     getCanvasCourses(token)
   );
+  console.log("loading token done");
+}
+
+async function loadOpenAIToken() {
+  openAIKey = await loadToken("openaikey.txt", "Enter OpenAI API key: ", () => true);
 }
 
 async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, canvasCourse: CanvasCourse) {
@@ -321,9 +360,12 @@ async function main() {
   let allCourseSettings = await loadCourseSettings();
   await loadEdToken();
   await loadCanvasToken();
+  await loadOpenAIToken();
 
   var edCourses = await getEdCourses(edToken);
+  console.log("loading canvas courses");
   var canvasCourses = await getCanvasCourses(canvasToken);
+  console.log("loading canvas courses done");
 
   while (true) {
     for (const [i, course] of edCourses.entries()) {
