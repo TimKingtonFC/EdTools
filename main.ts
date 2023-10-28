@@ -255,16 +255,9 @@ async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCour
         comment = `${r.MARK} - ${penalty} (late)`;
       }
     }
-    console.log(`Assigning grade of ${r.MARK} to ${r.NAME}`, comment);
-    await assignCanvasGrade(
-      canvasToken,
-      canvasCourse,
-      canvasAssignment,
-      canvasStudent,
-      r.MARK - penalty,
-      comment,
-      lessonDaysLate
-    );
+    let grade = r.MARK - penalty;
+    console.log(`Assigning grade of ${grade} to ${r.NAME}`, comment);
+    await assignCanvasGrade(canvasToken, canvasCourse, canvasAssignment, canvasStudent, grade, comment, lessonDaysLate);
   }
 }
 
@@ -293,9 +286,13 @@ async function loadToken(
 
   while (true) {
     if (token) {
-      if (await verificationFn(token)) {
-        await fs.writeFile(tokenFilename, token);
-        return token;
+      try {
+        if (await verificationFn(token)) {
+          await fs.writeFile(tokenFilename, token);
+          return token;
+        }
+      } catch {
+        // prompt for token
       }
     }
 
