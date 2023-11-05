@@ -26,9 +26,9 @@ export interface CanvasSubmission {
 
 async function canvasFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
   let resp = await fetch(input, init);
-  let cost = resp.headers.get("x-request-cost");
-  let remaining = resp.headers.get("x-rate-limit-remaining");
-  console.log(input, cost, remaining);
+  // let cost = resp.headers.get("x-request-cost");
+  // let remaining = resp.headers.get("x-rate-limit-remaining");
+  // console.log(input, cost, remaining);
 
   return resp;
 }
