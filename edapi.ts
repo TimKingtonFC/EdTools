@@ -125,6 +125,19 @@ export async function getEdLessons(token: string, course: EdCourse): Promise<EdL
   return data.lessons;
 }
 
+export async function getLessonResults(token: string, lesson: EdLesson): Promise<string> {
+  var response = await fetch(
+    `https://us.edstem.org/api/lessons/${lesson.id}/results.csv?points=0&students=1&completions=0&strategy=latest&tz=America%2FNew_York`,
+    {
+      method: "POST",
+      headers: {
+        "x-token": token,
+      },
+    }
+  );
+  return response.text();
+}
+
 export async function getEdLessonDetails(
   token: string,
   edNameSuffix: string,

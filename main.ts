@@ -2,8 +2,6 @@ import { parse } from "csv-parse/sync";
 import { promises as fs } from "fs";
 import fetch from "node-fetch";
 import OpenAI from "openai";
-import { homedir } from "os";
-import { join } from "path";
 import promptSync from "prompt-sync";
 import { CanvasCourse, assignCanvasGrade, getCanvasAssignments, getCanvasCourses } from "./canvasapi.js";
 import {
@@ -11,6 +9,7 @@ import {
   EdCourse,
   getEdCourses,
   getEdLessonDetails,
+  getLessonResults as getEdLessonResults,
   getEdLessons,
   getEdSlideResults,
   getEdSubmissions,
@@ -202,19 +201,11 @@ async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCour
   let edLessons = await getEdLessons(edToken, edCourse);
   let edLesson = await getEdLessonDetails(edToken, assignmentSettings.edNameSuffix, edLessons);
 
-  const downloadDir = join(homedir(), "Downloads");
-  const filenames = (await fs.readdir(downloadDir)).filter(
-    (name) => name.endsWith(".csv") && name.indexOf("results") >= 0
-  );
-
-  for (const [i, filename] of filenames.entries()) {
-    console.log(i, filename);
-  }
-  var n = Number(prompt("Results file?"));
-  let filename = join(downloadDir, filenames[n]);
+  console.log("Getting lesson results...");
+  let resultsCSV = await getEdLessonResults(edToken, edLesson);
 
   // Discard first row - useless headers.
-  let csvLines = (await fs.readFile(filename)).toString().split(/\r\n|\r|\n/);
+  let csvLines = resultsCSV.split(/\r\n|\r|\n/);
   csvLines = csvLines.slice(1);
 
   const data = parse(csvLines.join("\n"), {
