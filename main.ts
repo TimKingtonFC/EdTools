@@ -16,7 +16,7 @@ import {
   getEdSubmissions,
 } from "./edapi.js";
 
-const prompt = promptSync(undefined);
+const prompt = promptSync({ sigint: true });
 
 interface CourseSettings {
   assignments: AssignmentSettings[];
