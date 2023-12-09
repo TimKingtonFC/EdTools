@@ -40,8 +40,9 @@ export async function getCanvasCourses(token: string): Promise<CanvasCourse[]> {
     },
   });
   let courses = (await response.json()) as CanvasCourse[];
-  let now = new Date();
-  courses = courses.filter((course) => new Date(course.end_at) >= now);
+  let oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  courses = courses.filter((course) => new Date(course.end_at) >= oneWeekAgo);
 
   for (let course of courses) {
     let students = await getCanvasStudents(token, course);
