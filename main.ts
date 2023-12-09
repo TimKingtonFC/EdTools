@@ -273,7 +273,7 @@ async function loadToken(
   let token: string | undefined = undefined;
   try {
     token = (await fs.readFile(tokenFilename)).toString();
-  } catch {}
+  } catch { }
 
   while (true) {
     if (token) {
@@ -344,6 +344,15 @@ async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, can
   }
 }
 
+async function loadCourseMapping(): Promise<any> {
+  try {
+    return JSON.parse((await fs.readFile("course-mapping.json")).toString());
+  }
+  catch {
+    return {};
+  }
+}
+
 async function main() {
   let allCourseSettings = await loadCourseSettings();
   await loadEdToken();
@@ -354,6 +363,7 @@ async function main() {
   console.log("loading canvas courses");
   var canvasCourses = await getCanvasCourses(canvasToken);
   console.log("loading canvas courses done");
+  var courseMapping = await loadCourseMapping();
 
   while (true) {
     for (const [i, course] of edCourses.entries()) {
@@ -362,12 +372,22 @@ async function main() {
     var n = Number(prompt("Course to work with?"));
     let edCourse = edCourses[n];
 
-    // TODO: Auto-map courses?  Remember mapping?
-    for (const [i, course] of canvasCourses.entries()) {
-      console.log(i, course.name);
+    let canvasCourseName = courseMapping[edCourse.code];
+    let canvasCourse: CanvasCourse | undefined;
+    if (canvasCourseName) {
+      canvasCourse = canvasCourses.find(c => c.name == canvasCourseName);
     }
-    var n = Number(prompt("Course to work with?"));
-    let canvasCourse = canvasCourses[n];
+
+    if (!canvasCourse) {
+      for (const [i, course] of canvasCourses.entries()) {
+        console.log(i, course.name);
+      }
+      var n = Number(prompt("Course to work with?"));
+      canvasCourse = canvasCourses[n];
+
+      courseMapping[edCourse.code] = canvasCourse.name;
+      await fs.writeFile("course-mapping.json", JSON.stringify(courseMapping));
+    }
 
     let courseSettings: CourseSettings | undefined = undefined;
     for (const [name, cs] of allCourseSettings.entries()) {
