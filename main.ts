@@ -7,12 +7,14 @@ import { CanvasCourse, assignCanvasGrade, getCanvasAssignments, getCanvasCourses
 import {
   EdCSVResult,
   EdCourse,
+  EdLesson,
   getEdCourses,
   getEdLessonDetails,
   getLessonResults as getEdLessonResults,
   getEdLessons,
   getEdSlideResults,
   getEdSubmissions,
+  getEdToken,
 } from "./edapi.js";
 
 const prompt = promptSync({ sigint: true });
@@ -24,7 +26,8 @@ interface CourseSettings {
 interface AssignmentSettings {
   edNameSuffix: string;
   dueOffset: number;
-  canvasNamePrefix: string;
+  canvasNamePrefix?: string;
+  canvasNameExact?: string;
 }
 
 let edToken: string;
@@ -52,7 +55,14 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
   const lessons = await getEdLessons(edToken, course);
 
   for (const { edNameSuffix, dueOffset } of courseSettings.assignments) {
-    const lesson = await getEdLessonDetails(edToken, edNameSuffix, lessons);
+    let lesson: EdLesson;
+    try {
+      lesson = await getEdLessonDetails(edToken, edNameSuffix, lessons);
+    }
+    catch {
+      console.log("Couldn't find lesson:" + edNameSuffix);
+      continue;
+    }
     const dueDate = new Date(hw1DueDate);
     dueDate.setDate(dueDate.getDate() + dueOffset);
     lesson.due_at = dueDate;
@@ -188,8 +198,13 @@ async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCour
   let canvasAssignments = await getCanvasAssignments(canvasToken, canvasCourse);
   let canvasAssignment;
   for (let ass of canvasAssignments) {
-    if (ass.name.startsWith(assignmentSettings.canvasNamePrefix)) {
+    if (assignmentSettings.canvasNameExact === ass.name) {
       canvasAssignment = ass;
+      break;
+    }
+    if (assignmentSettings.canvasNamePrefix && ass.name.startsWith(assignmentSettings.canvasNamePrefix)) {
+      canvasAssignment = ass;
+      break;
     }
   }
   if (!canvasAssignment) {
@@ -240,7 +255,7 @@ async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCour
       if (lessonDaysLate > 3) {
         penalty = r.MARK;
       } else {
-        penalty = Math.ceil(r.MARK * 0.1 * lessonDaysLate);
+        penalty = Math.round(r.MARK * 0.1 * lessonDaysLate);
       }
       if (penalty > 0) {
         comment = `${r.MARK} - ${penalty} (late)`;
@@ -263,48 +278,6 @@ async function loadCourseSettings(): Promise<Map<string, CourseSettings>> {
   }
 
   return dueDates;
-}
-
-async function loadToken(
-  tokenFilename: string,
-  tokenPrompt: string,
-  verificationFn: (token: string) => any
-): Promise<string> {
-  let token: string | undefined = undefined;
-  try {
-    token = (await fs.readFile(tokenFilename)).toString();
-  } catch { }
-
-  while (true) {
-    if (token) {
-      try {
-        if (await verificationFn(token)) {
-          await fs.writeFile(tokenFilename, token);
-          return token;
-        }
-      } catch {
-        // prompt for token
-      }
-    }
-
-    token = prompt(tokenPrompt);
-  }
-}
-
-async function loadEdToken() {
-  edToken = await loadToken("edtoken.txt", "Enter ed token (x-token header): ", (token: string) => getEdCourses(token));
-}
-
-async function loadCanvasToken() {
-  console.log("loading token");
-  canvasToken = await loadToken("canvastoken.txt", "Enter canvas token (Authorization header): ", (token: string) =>
-    getCanvasCourses(token)
-  );
-  console.log("loading token done");
-}
-
-async function loadOpenAIToken() {
-  openAIKey = await loadToken("openaikey.txt", "Enter OpenAI API key: ", () => true);
 }
 
 async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, canvasCourse: CanvasCourse) {
@@ -355,9 +328,10 @@ async function loadCourseMapping(): Promise<any> {
 
 async function main() {
   let allCourseSettings = await loadCourseSettings();
-  await loadEdToken();
-  await loadCanvasToken();
-  await loadOpenAIToken();
+  let secrets = JSON.parse((await fs.readFile("secrets.json")).toString());
+  edToken = await getEdToken(secrets["ed-user"], secrets["ed-password"]);
+  canvasToken = secrets["canvas-token"];
+  openAIKey = secrets["openai-key"];
 
   var edCourses = await getEdCourses(edToken);
   console.log("loading canvas courses");

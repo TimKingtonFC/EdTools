@@ -79,6 +79,21 @@ export interface EdCSVResult {
   MARK: number;
 }
 
+export async function getEdToken(user: string, password: string): Promise<string> {
+  const response = await fetch("https://us.edstem.org/api/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      login: user,
+      password: password,
+    })
+  });
+  const data = (await response.json()) as { token: string };
+  return data.token;
+}
+
 export async function getEdCourses(token: string): Promise<EdCourse[]> {
   const response = await fetch("https://us.edstem.org/api/user", {
     headers: {

@@ -4,13 +4,22 @@ This is a tool to help with using Ed and Canvas.  It lets you quickly set up due
 
 ## Using the Tool
 
-You'll need to install npm, and clone this repository.  Run the tool with `npm start`.
-You'll be asked for your Ed and Canvas tokens.  You can get these by using the Chrome 
-debugger and looking at the headers for requests as you move around the sites.  You'll be
-asked to choose the Ed course and Canvas course you want to use next - make sure you choose
-the same course.
+You'll need to install npm, and clone this repository.  Fill in secrets.txt (you only need the open AI key if you want it to pull questions out of reflection answers).
+
+```json
+{
+    "ed-user": "<Ed username>",
+    "ed-password": "<Ed password>",
+    "canvas-token": "Bearer <Canvas API token>",
+    "openai-key": "<open AI API key>"
+}
+```
+
+Run the tool with `npm start`.  You'll be asked to choose the Ed course and Canvas course you want to use next - make sure you choose
+the same course - the tool will remember this mapping.  If you get it wrong, delete course-mapping.json.
 
 Then you have three options:
+
 1. Grade Assignments
 2. Get reflection questions
 3. Set up course
@@ -30,6 +39,7 @@ and the questions will be written to `questions.txt`.
 ### Set up course
 
 This does a few things:
+
 - Assigns due dates to the assignments in the course based on what's in the courses/*.json files.
 - If the lesson name contains "Exam", it sets the time limit to 180 minutes and assigns a password so students can't see the assignment early.
 - The reveal challenge feedback box on every lesson is checked, so feedback will appear to students immediately as entered.
