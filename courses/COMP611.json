@@ -18,7 +18,17 @@
     {
       "edNameSuffix": "VM 1",
       "dueOffset": 7,
-      "canvasNamePrefix": "Git Project Part 1:"
+      "canvasNamePrefix": "Git Project Part 1:",
+      "videos": [
+        {
+          "name": "Solution for VM Part 1",
+          "link": "https://www.dropbox.com/scl/fi/5d0dvjcomnxvtsgu7faig/VM-Project-Part-01-Solution.mp4?rlkey=s7e5yd7hbj94p4a5b4359mr14&st=t6acva98&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 2",
+          "link": "https://www.dropbox.com/scl/fi/1ken8juik2xjbe1xqqqvl/VM-Project-Part-02-Intro.mp4?rlkey=6ki0rqb722uwedixihd5pv8t9&st=o6vp17pz&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 3",
@@ -33,7 +43,17 @@
     {
       "edNameSuffix": "VM 2",
       "dueOffset": 14,
-      "canvasNamePrefix": "Git Project Part 2"
+      "canvasNamePrefix": "Git Project Part 2",
+      "videos": [
+        {
+          "name": "Solution for VM Part 2",
+          "link": "https://www.dropbox.com/scl/fi/wkniorp85c58zalvve12r/VM-Project-Part-02-Solution.mp4?rlkey=hn9grnm2t6irxvv1n8z4v3asi&st=merp80ds&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 3",
+          "link": "https://www.dropbox.com/scl/fi/4u0cj0sjt6jnti5aop1py/VM-Project-Part-03-Intro.mp4?rlkey=kwok49a4v8li363dd6vtth34z&st=7a00d6ql&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 4",
@@ -48,7 +68,17 @@
     {
       "edNameSuffix": "VM 3",
       "dueOffset": 21,
-      "canvasNamePrefix": "Git Project Part 3"
+      "canvasNamePrefix": "Git Project Part 3",
+      "videos": [
+        {
+          "name": "Solution for VM Part 3",
+          "link": "https://www.dropbox.com/scl/fi/pa91rm0zgo5x3x8fmiry2/VM-Project-Part-03-Solution.mp4?rlkey=4zoocmwfctrz0qu1o0hlyd0gz&st=yubhocfi&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 4",
+          "link": "https://www.dropbox.com/scl/fi/c34ppntgal8z9h1c7bhqh/VM-Project-Part-04-Intro.mp4?rlkey=i2cs5cnu599qmrb22opvehryf&st=75xfye61&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 5",
@@ -63,7 +93,17 @@
     {
       "edNameSuffix": "VM 4",
       "dueOffset": 28,
-      "canvasNamePrefix": "Git Project Part 4"
+      "canvasNamePrefix": "Git Project Part 4",
+      "videos": [
+        {
+          "name": "Solution for VM Part 4",
+          "link": "https://www.dropbox.com/scl/fi/zcxmncg0wccln2t2b4som/VM-Project-Part-04-Solution.mp4?rlkey=glg9kad8bhhelkgvt7ue9hrrh&st=4jlavxvp&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 5",
+          "link": "https://www.dropbox.com/scl/fi/0dhpqrbqto44lcd9q1ckq/VM-Project-Part-05-Intro.mp4?rlkey=cjb21kfamu3ze8h3qwgdo8ynz&st=yx2m4m26&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 6",
@@ -78,7 +118,17 @@
     {
       "edNameSuffix": "VM 5",
       "dueOffset": 35,
-      "canvasNamePrefix": "Git Project Part 5"
+      "canvasNamePrefix": "Git Project Part 5",
+      "videos": [
+        {
+          "name": "Solution for VM Part 5",
+          "link": "https://www.dropbox.com/scl/fi/vdek0q9qxi2ujnv8sfcli/VM-Project-Part-05-Solution.mp4?rlkey=fthnm1q8x9t357dwsmjpbxijv&st=gicy301t&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 6",
+          "link": "https://www.dropbox.com/scl/fi/6w6xyczh9pddkc7kp3fhu/VM-Project-Part-06-Intro.mp4?rlkey=6w4xs5pr5dfbi0s5ab5nf9xte&st=j1g6o70o&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 7",
@@ -93,7 +143,17 @@
     {
       "edNameSuffix": "VM 6",
       "dueOffset": 42,
-      "canvasNamePrefix": "Git Project Part 6"
+      "canvasNamePrefix": "Git Project Part 6",
+      "videos": [
+        {
+          "name": "Solution for VM Part 6",
+          "link": "https://www.dropbox.com/scl/fi/20bkcuwa3c0rmqnl9cdla/VM-Project-Part-06-Solution.mp4?rlkey=9k1ifm2zouxonr65ey568kacz&st=v8zdarag&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 7",
+          "link": "https://www.dropbox.com/scl/fi/8ztbgx0xoe6rpetqpe8f9/VM-Project-Part-07-Intro.mp4?rlkey=26d5y8htpvieohg43u299067s&st=gzch85ih&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 8",
@@ -108,7 +168,17 @@
     {
       "edNameSuffix": "VM 7",
       "dueOffset": 49,
-      "canvasNamePrefix": "Git Project Part 7"
+      "canvasNamePrefix": "Git Project Part 7",
+      "videos": [
+        {
+          "name": "Solution for VM Part 7",
+          "link": "https://www.dropbox.com/scl/fi/9wpp82sc9t92kuuq2ynx4/VM-Project-Part-07-Solution.mp4?rlkey=hqxwp0vgkjl1er1hgehe39rv3&st=kxfu2uwu&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 8",
+          "link": "https://www.dropbox.com/scl/fi/fd9120xa4ej49zez0ocyu/VM-Project-Part-08-Intro.mp4?rlkey=vae76vnd9kzzh66oavhadbmuf&st=kd6ohxwe&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 9",
@@ -123,7 +193,17 @@
     {
       "edNameSuffix": "VM 8",
       "dueOffset": 56,
-      "canvasNamePrefix": "Git Project Part 8"
+      "canvasNamePrefix": "Git Project Part 8",
+      "videos": [
+        {
+          "name": "Solution for VM Part 8",
+          "link": "https://www.dropbox.com/scl/fi/y3dhguac566gd6cs1ac9s/VM-Project-Part-08-Solution.mp4?rlkey=trdqkdsf68wstx7g3wnt8daze&st=1ct8aymi&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 9",
+          "link": "https://www.dropbox.com/scl/fi/l5qdw6dmu843cnmi1ovnc/VM-Project-Part-09-Intro.mp4?rlkey=pcx25mxwo716itmsymols8qmp&st=sdfphfvm&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "HW 10",
@@ -138,7 +218,17 @@
     {
       "edNameSuffix": "VM 9",
       "dueOffset": 63,
-      "canvasNamePrefix": "Git Project Part 9"
+      "canvasNamePrefix": "Git Project Part 9",
+      "videos": [
+        {
+          "name": "Solution for VM Part 9",
+          "link": "https://www.dropbox.com/scl/fi/b1d21zr5isgqcri0cwscd/VM-Project-Part-09-Solution.mp4?rlkey=dya3fpnle2l0gz7gdsbnf6pfh&st=57ny5tdq&dl=0"
+        },
+        {
+          "name": "Intro for VM Part 10",
+          "link": "https://www.dropbox.com/scl/fi/5hsaet47u6kh09zy1zu0e/VM-Project-Part-10-Intro.mp4?rlkey=nrcvytadj63ja8cjkk4x2xyvh&st=eayalblw&dl=0"
+        }
+      ]
     },
     {
       "edNameSuffix": "Git Part 10",

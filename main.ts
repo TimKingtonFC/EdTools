@@ -1,6 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { promises as fs } from "fs";
 import fetch from "node-fetch";
+import { encode } from "html-entities";
 import OpenAI from "openai";
 import promptSync from "prompt-sync";
 import { CanvasCourse, assignCanvasGrade, getCanvasAssignments, getCanvasCourses } from "./canvasapi.js";
@@ -15,6 +16,7 @@ import {
   getEdSlideResults,
   getEdSubmissions,
   getEdToken,
+  postThread,
 } from "./edapi.js";
 
 const prompt = promptSync({ sigint: true });
@@ -24,10 +26,17 @@ interface CourseSettings {
 }
 
 interface AssignmentSettings {
+  name: string;
   edNameSuffix: string;
   dueOffset: number;
   canvasNamePrefix?: string;
   canvasNameExact?: string;
+  videos?: [VideoLink];
+}
+
+interface VideoLink {
+  name: string;
+  link: string;
 }
 
 let edToken: string;
@@ -46,20 +55,32 @@ function makePassword(length: number): string {
   return result;
 }
 
+async function postVideos(course: EdCourse, dropDeadDate: Date, videos: [VideoLink]) {
+  for (const vidlink of videos) {
+    console.log(`Posting video link: ${vidlink.name}`);
+    let body = `<paragraph>${encode(vidlink.name)}:</paragraph><paragraph>${encode(vidlink.link)}</paragraph>`;
+    await postThread(edToken, course, vidlink.name, body, dropDeadDate);
+  }
+}
+
 async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
   const dateStr = prompt("Enter date for HW 1 (m/d): ");
   const [month, day] = dateStr.split("/");
   const hw1DueDate = new Date();
   hw1DueDate.setMonth((month as any) - 1, day as any); // TODO
   hw1DueDate.setHours(23, 59, 0);
+
+  const dropDeadStr = prompt("Enter drop dead offset [3,18:30]: ", "3,18:30");
+  const [dropDeadDays, dropDeadTime] = dropDeadStr.split(",");
+  const [dropDeadHours, dropDeadMinutes] = dropDeadTime.split(":");
+
   const lessons = await getEdLessons(edToken, course);
 
-  for (const { edNameSuffix, dueOffset } of courseSettings.assignments) {
+  for (const { edNameSuffix, dueOffset, videos } of courseSettings.assignments) {
     let lesson: EdLesson;
     try {
       lesson = await getEdLessonDetails(edToken, edNameSuffix, lessons);
-    }
-    catch {
+    } catch {
       console.log("Couldn't find lesson:" + edNameSuffix);
       continue;
     }
@@ -126,12 +147,19 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
     if (!response.ok) {
       console.error("Error setting date", response.statusText);
     }
+
+    if (videos) {
+      const dropDeadDate = new Date(dueDate);
+      dropDeadDate.setDate(dropDeadDate.getDate() + parseInt(dropDeadDays));
+      dropDeadDate.setHours(parseInt(dropDeadHours), parseInt(dropDeadMinutes), 0);
+      await postVideos(course, dropDeadDate, videos);
+    }
   }
 }
 
 function chooseAssignment(courseSettings: CourseSettings): AssignmentSettings {
   for (const [i, assignment] of courseSettings.assignments.entries()) {
-    console.log(i, assignment.canvasNamePrefix);
+    console.log(i, assignment.edNameSuffix);
   }
   var n = Number(prompt("Assignment to grade?"));
   return courseSettings.assignments[n];
@@ -320,8 +348,7 @@ async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, can
 async function loadCourseMapping(): Promise<any> {
   try {
     return JSON.parse((await fs.readFile("course-mapping.json")).toString());
-  }
-  catch {
+  } catch {
     return {};
   }
 }
@@ -349,7 +376,7 @@ async function main() {
     let canvasCourseName = courseMapping[edCourse.code];
     let canvasCourse: CanvasCourse | undefined;
     if (canvasCourseName) {
-      canvasCourse = canvasCourses.find(c => c.name == canvasCourseName);
+      canvasCourse = canvasCourses.find((c) => c.name == canvasCourseName);
     }
 
     if (!canvasCourse) {

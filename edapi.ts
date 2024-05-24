@@ -88,7 +88,7 @@ export async function getEdToken(user: string, password: string): Promise<string
     body: JSON.stringify({
       login: user,
       password: password,
-    })
+    }),
   });
   const data = (await response.json()) as { token: string };
   return data.token;
@@ -195,4 +195,50 @@ export async function getEdSlideResults(token: string, slide: EdSlide): Promise<
   });
   const data = (await response.json()) as { results: EdResult };
   return data.results;
+}
+
+export async function postThread(token: string, course: EdCourse, title: string, body: string, date: Date) {
+  let response = await fetch("https://us.edstem.org/api/courses/" + course.id + "/thread_drafts", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Token": token,
+    },
+    body: JSON.stringify({
+      thread_draft: {
+        course_id: course.id,
+        type: "post",
+        title: title,
+        content: `<document version=\"2.0\">${body}</document>`,
+        category: "General",
+        subcategory: "",
+        subsubcategory: "",
+        is_pinned: false,
+        is_private: false,
+        is_anonymous: false,
+        is_megathread: false,
+        anonymous_comments: false,
+      },
+    }),
+  });
+  const draft = (await response.json()) as { thread_draft: { id: number } };
+  const threadId = draft.thread_draft.id;
+
+  response = await fetch(
+    "https://us.edstem.org/api/thread_drafts/" +
+      threadId +
+      "/schedule?send_emails=1&scheduled_time=" +
+      date.toISOString(),
+    {
+      method: "PATCH",
+      headers: {
+        "X-Token": token,
+      },
+    }
+  );
+
+  await response.json();
+  if (!response.ok) {
+    console.error("Error creating thread", response.statusText);
+  }
 }
