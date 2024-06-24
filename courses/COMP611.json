@@ -19,6 +19,7 @@
       "edNameSuffix": "VM 1",
       "dueOffset": 7,
       "canvasNamePrefix": "Git Project Part 1:",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 1",
@@ -44,6 +45,7 @@
       "edNameSuffix": "VM 2",
       "dueOffset": 14,
       "canvasNamePrefix": "Git Project Part 2",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 2",
@@ -69,6 +71,7 @@
       "edNameSuffix": "VM 3",
       "dueOffset": 21,
       "canvasNamePrefix": "Git Project Part 3",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 3",
@@ -94,6 +97,7 @@
       "edNameSuffix": "VM 4",
       "dueOffset": 28,
       "canvasNamePrefix": "Git Project Part 4",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 4",
@@ -119,6 +123,7 @@
       "edNameSuffix": "VM 5",
       "dueOffset": 35,
       "canvasNamePrefix": "Git Project Part 5",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 5",
@@ -144,6 +149,7 @@
       "edNameSuffix": "VM 6",
       "dueOffset": 42,
       "canvasNamePrefix": "Git Project Part 6",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 6",
@@ -169,6 +175,7 @@
       "edNameSuffix": "VM 7",
       "dueOffset": 49,
       "canvasNamePrefix": "Git Project Part 7",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 7",
@@ -194,6 +201,7 @@
       "edNameSuffix": "VM 8",
       "dueOffset": 56,
       "canvasNamePrefix": "Git Project Part 8",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 8",
@@ -219,6 +227,7 @@
       "edNameSuffix": "VM 9",
       "dueOffset": 63,
       "canvasNamePrefix": "Git Project Part 9",
+      "restrictSubmissions": true,
       "videos": [
         {
           "name": "Solution for VM Part 9",
@@ -238,7 +247,8 @@
     {
       "edNameSuffix": "VM 10",
       "dueOffset": 70,
-      "canvasNamePrefix": "Git Project Part 10"
+      "canvasNamePrefix": "Git Project Part 10",
+      "restrictSubmissions": true
     }
   ]
 }

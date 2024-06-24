@@ -32,6 +32,7 @@ interface AssignmentSettings {
   canvasNamePrefix?: string;
   canvasNameExact?: string;
   videos?: [VideoLink];
+  restrictSubmissions: boolean;
 }
 
 interface VideoLink {
@@ -76,7 +77,7 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
 
   const lessons = await getEdLessons(edToken, course);
 
-  for (const { edNameSuffix, dueOffset, videos } of courseSettings.assignments) {
+  for (const { edNameSuffix, dueOffset, videos, restrictSubmissions } of courseSettings.assignments) {
     let lesson: EdLesson;
     try {
       lesson = await getEdLessonDetails(edToken, edNameSuffix, lessons);
@@ -133,7 +134,18 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
       {}
     );
 
-    const body = JSON.stringify({ lesson: filteredLesson });
+    let body = { lesson: filteredLesson } as any;
+
+    if (restrictSubmissions) {
+      body.lesson.require_user_override = true;
+      body.override_upserts = [];
+      for (var student of course.students.values()) {
+        body.override_upserts.push({ lesson_id: lesson.id, user_id: student.id });
+      }
+    }
+
+    const bodyJSON = JSON.stringify(body);
+
     console.log(`Setting date for ${lesson.title} to ${dueDate}`);
     let response = await fetch(`https://us.edstem.org/api/lessons/${lesson.id}`, {
       method: "PUT",
@@ -141,7 +153,7 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
         "content-type": "application/json",
         "x-token": edToken,
       },
-      body: body,
+      body: bodyJSON,
     });
 
     if (!response.ok) {
