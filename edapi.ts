@@ -94,7 +94,7 @@ export async function getEdToken(user: string, password: string): Promise<string
   return data.token;
 }
 
-export async function getEdCourses(token: string): Promise<EdCourse[]> {
+export async function getEdCourses(token: string, courseSettings: Map<string, any>): Promise<EdCourse[]> {
   const response = await fetch("https://us.edstem.org/api/user", {
     headers: {
       "x-token": token,
@@ -104,7 +104,11 @@ export async function getEdCourses(token: string): Promise<EdCourse[]> {
   let courses = data.courses.map(({ course }) => course);
 
   courses = courses.filter(
-    (course) => course.status === "active" && !course.code.includes("Master") && course.code !== "Franklin Sandbox"
+    (course) =>
+      course.status === "active" &&
+      !course.code.includes("Master") &&
+      course.code !== "Franklin Sandbox" &&
+      courseSettings.get(course.code)
   );
 
   for (let course of courses) {

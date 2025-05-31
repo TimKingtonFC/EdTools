@@ -1,7 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { promises as fs } from "fs";
-import fetch from "node-fetch";
 import { encode } from "html-entities";
+import fetch from "node-fetch";
 import OpenAI from "openai";
 import promptSync from "prompt-sync";
 import { CanvasCourse, assignCanvasGrade, getCanvasAssignments, getCanvasCourses } from "./canvasapi.js";
@@ -321,11 +321,15 @@ async function loadCourseSettings(): Promise<Map<string, CourseSettings>> {
 }
 
 async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, canvasCourse: CanvasCourse) {
+  let missingStudents = [];
   for (let canvasStudent of canvasCourse.students.values()) {
     let es = edCourse.students.get(canvasStudent.name);
     if (!es) {
-      throw new Error("Couldn't find ed student for " + canvasStudent.name);
+      missingStudents.push(canvasStudent.name);
     }
+  }
+  if (missingStudents.length > 0) {
+    throw new Error("Couldn't find ed students for " + missingStudents);
   }
 
   while (true) {
@@ -372,7 +376,7 @@ async function main() {
   canvasToken = secrets["canvas-token"];
   openAIKey = secrets["openai-key"];
 
-  var edCourses = await getEdCourses(edToken);
+  var edCourses = await getEdCourses(edToken, allCourseSettings);
   console.log("loading canvas courses");
   var canvasCourses = await getCanvasCourses(canvasToken);
   console.log("loading canvas courses done");

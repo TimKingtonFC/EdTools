@@ -34,7 +34,7 @@ async function canvasFetch(input: RequestInfo, init?: RequestInit): Promise<Resp
 }
 
 export async function getCanvasCourses(token: string): Promise<CanvasCourse[]> {
-  const response = await canvasFetch("https://franklin.instructure.com/api/v1/courses?per_page=100", {
+  const response = await canvasFetch("https://franklin.instructure.com/api/v1/courses?per_page=500", {
     headers: {
       Authorization: token,
     },
