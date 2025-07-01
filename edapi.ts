@@ -50,6 +50,8 @@ export interface EdCourse {
   id: number;
   code: string;
   status: string;
+  year: number;
+  session: string;
   students: Map<string, EdStudent>;
 }
 
@@ -79,6 +81,18 @@ export interface EdCSVResult {
   MARK: number;
 }
 
+export interface EdUser {
+  id: number;
+  name: string;
+}
+
+export interface EdThread {
+  id: number;
+  title: string;
+  document: string;
+  user: EdUser;
+}
+
 export async function getEdToken(user: string, password: string): Promise<string> {
   const response = await fetch("https://us.edstem.org/api/token", {
     method: "POST",
@@ -94,7 +108,11 @@ export async function getEdToken(user: string, password: string): Promise<string
   return data.token;
 }
 
-export async function getEdCourses(token: string, courseSettings: Map<string, any>): Promise<EdCourse[]> {
+export async function getEdCourses(
+  token: string,
+  includeStudents: boolean,
+  filter: (c: EdCourse) => boolean
+): Promise<EdCourse[]> {
   const response = await fetch("https://us.edstem.org/api/user", {
     headers: {
       "x-token": token,
@@ -103,22 +121,18 @@ export async function getEdCourses(token: string, courseSettings: Map<string, an
   const data = (await response.json()) as { courses: { course: EdCourse }[] };
   let courses = data.courses.map(({ course }) => course);
 
-  courses = courses.filter(
-    (course) =>
-      course.status === "active" &&
-      !course.code.includes("Master") &&
-      course.code !== "Franklin Sandbox" &&
-      courseSettings.get(course.code)
-  );
+  courses = courses.filter(filter);
 
-  for (let course of courses) {
-    let students = await getEdStudents(token, course);
+  if (includeStudents) {
+    for (let course of courses) {
+      let students = await getEdStudents(token, course);
 
-    let map = new Map<string, EdStudent>();
-    for (let edStudent of students) {
-      map.set(edStudent.name, edStudent);
+      let map = new Map<string, EdStudent>();
+      for (let edStudent of students) {
+        map.set(edStudent.name, edStudent);
+      }
+      course.students = map;
     }
-    course.students = map;
   }
 
   return courses;
@@ -245,4 +259,26 @@ export async function postThread(token: string, course: EdCourse, title: string,
   if (!response.ok) {
     console.error("Error creating thread", response.statusText);
   }
+}
+
+export async function listDiscussionPosts(token: string, course: EdCourse) {
+  var limit = 30;
+  var offset = 0;
+  var threads: EdThread[] = [];
+  var data: { threads: EdThread[] };
+  do {
+    var response = await fetch(
+      `https://us.edstem.org/api/courses/${course.id}/threads?limit=${limit}&offset=${offset}&sort=new`,
+      {
+        headers: {
+          "x-token": token,
+        },
+      }
+    );
+    data = (await response.json()) as { threads: EdThread[] };
+    threads = threads.concat(data.threads);
+    offset += limit;
+  } while (data.threads.length == limit);
+
+  return threads;
 }

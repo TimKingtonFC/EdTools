@@ -16,6 +16,7 @@ import {
   getEdSlideResults,
   getEdSubmissions,
   getEdToken,
+  listDiscussionPosts,
   postThread,
 } from "./edapi.js";
 
@@ -61,6 +62,36 @@ async function postVideos(course: EdCourse, dropDeadDate: Date, videos: [VideoLi
     console.log(`Posting video link: ${vidlink.name}`);
     let body = `<paragraph>${encode(vidlink.name)}:</paragraph><paragraph>${encode(vidlink.link)}</paragraph>`;
     await postThread(edToken, course, vidlink.name, body, dropDeadDate);
+  }
+}
+
+async function getReflectionAnswers() {
+  for (var course of await getEdCourses(edToken, false, (c) => true)) {
+    var courseNum: string;
+    if (course.code.includes("311")) {
+      courseNum = "311";
+    } else if (course.code.includes("611")) {
+      courseNum = "611";
+    } else continue;
+
+    let threads = await listDiscussionPosts(edToken, course);
+    for (let thread of threads) {
+      if (thread.user.name !== "Tim Kington" || !thread.title.startsWith("HW") || !thread.title.endsWith("Questions")) {
+        continue;
+      }
+
+      let week = parseInt(thread.title.substring(2, thread.title.length - 10));
+      if (isNaN(week)) {
+        console.log("Skipping " + thread.title);
+        continue;
+      }
+
+      await fs.mkdir(`questions/${courseNum}/${week}`, { recursive: true });
+      await fs.writeFile(
+        `questions/${courseNum}/${week}/${course.year}-${course.session}-${thread.id}.txt`,
+        thread.document
+      );
+    }
   }
 }
 
@@ -376,7 +407,18 @@ async function main() {
   canvasToken = secrets["canvas-token"];
   openAIKey = secrets["openai-key"];
 
-  var edCourses = await getEdCourses(edToken, allCourseSettings);
+  var edCourses = await getEdCourses(
+    edToken,
+    true,
+    (course: EdCourse) =>
+      !!(
+        course.status === "active" &&
+        !course.code.includes("Master") &&
+        course.code !== "Franklin Sandbox" &&
+        allCourseSettings.get(course.code)
+      )
+  );
+
   console.log("loading canvas courses");
   var canvasCourses = await getCanvasCourses(canvasToken);
   console.log("loading canvas courses done");
@@ -386,7 +428,13 @@ async function main() {
     for (const [i, course] of edCourses.entries()) {
       console.log(i, course.id, course.code);
     }
-    var n = Number(prompt("Course to work with?"));
+    console.log("G. Get reflection answers");
+    var entry = prompt("Course to work with?");
+    if (entry === "g" || entry === "G") {
+      await getReflectionAnswers();
+      continue;
+    }
+    var n = Number(entry);
     let edCourse = edCourses[n];
 
     let canvasCourseName = courseMapping[edCourse.code];
