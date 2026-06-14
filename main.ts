@@ -89,7 +89,7 @@ async function getReflectionAnswers() {
       await fs.mkdir(`questions/${courseNum}/${week}`, { recursive: true });
       await fs.writeFile(
         `questions/${courseNum}/${week}/${course.year}-${course.session}-${thread.id}.txt`,
-        thread.document
+        thread.document,
       );
     }
   }
@@ -121,6 +121,10 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
     lesson.due_at = dueDate;
     lesson.release_feedback = true;
     lesson.release_feedback_while_active = true;
+
+    if (lesson.title.startsWith("Exercises")) {
+      lesson.release_challenge_solutions_while_active = true;
+    }
 
     if (lesson.title.includes("Exam")) {
       lesson.is_timed = true;
@@ -160,9 +164,10 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
       "settings",
       "prerequisites",
     ];
+
     const filteredLesson = fields.reduce(
       (acc, cur) => Object.assign(acc, { [cur]: (lesson as any)[cur] }), // TODO - find better way?  Test which fields need to be there?
-      {}
+      {},
     );
 
     let body = { lesson: filteredLesson } as any;
@@ -241,15 +246,21 @@ async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse):
       messages: [
         {
           role: "user",
-          content: "Please find any questions in the following text and list them.  Here is the text: " + answer.data,
+          content:
+            `Please find any questions in the following text and list them with their exact wording.  Include implied questions containing phrases like "I'm still wondering about" or "I would like to know" or "I'm not sure about". If there are no questions, please tell me \"${answer.user_name} asked no questions\".  Here is the text: ` +
+            answer.data,
         },
       ],
-      model: "gpt-4",
+      model: "gpt-5-nano",
     });
 
     let response: string | undefined | null = chatCompletion.choices[0].message.content;
     console.log(response);
-    if (response?.includes("does not contain any questions")) {
+    if (
+      response?.includes("asked no questions") ||
+      response?.includes("does not contain any questions") ||
+      response?.includes("no explicit questions")
+    ) {
       console.log("No questions found");
       studentQuestions += ` ${answer.user_name}'s reflection has no questions: ` + answer.data + " ";
     }
@@ -315,7 +326,7 @@ async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCour
       }
 
       let daysLate = Math.ceil(
-        (+new Date(submissions[0].marked_at) - +new Date(edLesson.due_at)) / (24 * 60 * 60 * 1000)
+        (+new Date(submissions[0].marked_at) - +new Date(edLesson.due_at)) / (24 * 60 * 60 * 1000),
       );
       lessonDaysLate = Math.max(lessonDaysLate, daysLate);
     }
@@ -416,7 +427,7 @@ async function main() {
         !course.code.includes("Master") &&
         course.code !== "Franklin Sandbox" &&
         allCourseSettings.get(course.code)
-      )
+      ),
   );
 
   console.log("loading canvas courses");

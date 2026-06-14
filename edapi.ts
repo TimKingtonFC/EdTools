@@ -23,7 +23,7 @@ export interface EdLesson {
   release_quiz_solutions: string;
   release_quiz_correctness_only: string;
   release_challenge_solutions: string;
-  release_challenge_solutions_while_active: string;
+  release_challenge_solutions_while_active: boolean;
   reopen_submissions: string;
   late_submissions: string;
   available_at: string;
@@ -111,7 +111,7 @@ export async function getEdToken(user: string, password: string): Promise<string
 export async function getEdCourses(
   token: string,
   includeStudents: boolean,
-  filter: (c: EdCourse) => boolean
+  filter: (c: EdCourse) => boolean,
 ): Promise<EdCourse[]> {
   const response = await fetch("https://us.edstem.org/api/user", {
     headers: {
@@ -166,7 +166,7 @@ export async function getLessonResults(token: string, lesson: EdLesson): Promise
       headers: {
         "x-token": token,
       },
-    }
+    },
   );
   return response.text();
 }
@@ -174,7 +174,7 @@ export async function getLessonResults(token: string, lesson: EdLesson): Promise
 export async function getEdLessonDetails(
   token: string,
   edNameSuffix: string,
-  edLessons: EdLesson[]
+  edLessons: EdLesson[],
 ): Promise<EdLesson> {
   for (const lesson of edLessons) {
     if (lesson.title.endsWith(edNameSuffix)) {
@@ -194,7 +194,7 @@ export async function getEdLessonDetails(
 export async function getEdSubmissions(
   token: string,
   student: EdStudent,
-  challenge_id: number
+  challenge_id: number,
 ): Promise<EdSubmission[]> {
   var response = await fetch(`https://us.edstem.org/api/users/${student.id}/challenges/${challenge_id}/submissions`, {
     headers: {
@@ -252,7 +252,7 @@ export async function postThread(token: string, course: EdCourse, title: string,
       headers: {
         "X-Token": token,
       },
-    }
+    },
   );
 
   await response.json();
@@ -273,7 +273,7 @@ export async function listDiscussionPosts(token: string, course: EdCourse) {
         headers: {
           "x-token": token,
         },
-      }
+      },
     );
     data = (await response.json()) as { threads: EdThread[] };
     threads = threads.concat(data.threads);
