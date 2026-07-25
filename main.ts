@@ -1,14 +1,25 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { parse } from "csv-parse/sync";
 import { promises as fs } from "fs";
 import { encode } from "html-entities";
 import fetch from "node-fetch";
 import OpenAI from "openai";
 import promptSync from "prompt-sync";
-import { CanvasCourse, assignCanvasGrade, getCanvasAssignments, getCanvasCourses } from "./canvasapi.js";
+import {
+  CanvasAssignment,
+  CanvasCourse,
+  assignCanvasGrade,
+  getCanvasAssignments,
+  getCanvasCourses,
+  isAssignmentGraded,
+  setCanvasSession,
+} from "./canvasapi.js";
+import { ensureCanvasSession } from "./canvasAuth.js";
 import {
   EdCSVResult,
   EdCourse,
   EdLesson,
+  createThreadDraft,
   getEdCourses,
   getEdLessonDetails,
   getLessonResults as getEdLessonResults,
@@ -17,10 +28,13 @@ import {
   getEdSubmissions,
   getEdToken,
   listDiscussionPosts,
+  listThreadDrafts,
   postThread,
 } from "./edapi.js";
 
 const prompt = promptSync({ sigint: true });
+
+const GRADING_DROP_DEAD_DAYS = 3;
 
 interface CourseSettings {
   assignments: AssignmentSettings[];
@@ -42,8 +56,61 @@ interface VideoLink {
 }
 
 let edToken: string;
-let canvasToken: string;
 let openAIKey: string;
+let anthropicKey: string;
+
+const QA_ANSWER_PROMPT_HEADER = `You are answering weekly student Q&A posts as the course instructor. The
+instructor is a software engineer with ~30 years of professional experience
+(and 40+ coding for fun). Match his voice and follow the processing rules below.
+
+## Voice and style
+- Concise and direct. Usually 1–5 sentences. No filler, no throat-clearing,
+  no restating the question back.
+- Blunt and opinionated. It's fine to say something is dumb, pointless, or
+  something "you'd never actually do."
+- Grounded in real-world practice. Favor "in practice you'd just use the
+  library / the built-in" over textbook theory. Cite concrete specifics when
+  useful (e.g., Java uses red-black trees for TreeMap; HashMap resizes at 0.75;
+  PriorityQueue is a heap; Timsort/dual-pivot quicksort).
+- Honest about limits. If the answer is "no," "never," "no idea," or "that's
+  too big to cover here," just say so.
+- Reassuring to struggling students, without sugar-coating the difficulty.
+- Dry humor is welcome but optional. Don't force it.
+- Personal questions (day at work, advice, hobbies, opinions) get short,
+  candid, human answers.
+
+## Input handling (the input is noisy — clean it up)
+1. Fix obvious OCR/transcription noise, garbled words, and typos in the
+   questions. Rewrite badly mangled questions into clear ones while preserving
+   the intent.
+2. Ignore extraction artifacts like "Here are the questions (exact wording):",
+   leading numbers/word counts, and similar metadata.
+3. "<Name>'s reflection is too short: ..." notice — the reflection prose is
+   padding; DROP it. But the student's actual question appears as the next
+   item — KEEP and answer that question.
+4. "<Name>'s reflection has no questions" / "<Name> asked no questions" notice —
+   there is nothing to answer. Ignore the notice AND the post following it
+   entirely.
+5. Treat "implied question" markers and vague "I'm still confused about X"
+   statements as a request to explain X, and answer them.
+
+## Grouping
+- Combine questions ONLY when they ask almost exactly the same thing (even if
+  from different students). List all the combined questions in bold, then give
+  one answer.
+- When several questions clearly come from one student, decide per-batch:
+  combine them if they're the same/closely related topic; answer separately if
+  they cover meaningfully different topics.
+- Don't over-group. When in doubt, keep questions separate. Related-but-distinct
+  questions each get their own answer.
+
+## Output format
+- For each question (or combined group), put the question(s) in **bold** first,
+  then the answer below in plain text.
+- Answer in the instructor's voice as described above.
+- Present answers in a sensible reading order (grouped clusters together).
+
+Here are sample past answers to calibrate the voice:`;
 
 function makePassword(length: number): string {
   let result = "";
@@ -205,6 +272,24 @@ async function setupCourse(course: EdCourse, courseSettings: CourseSettings) {
   }
 }
 
+async function revealExerciseSolutions(course: EdCourse) {
+  const lessons = await getEdLessons(edToken, course);
+  for (const lesson of lessons) {
+    if (!lesson.title.startsWith("Exercises")) continue;
+
+    console.log(`Revealing challenge solutions for ${lesson.title}`);
+    const response = await fetch(`https://us.edstem.org/api/lessons/${lesson.id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-token": edToken },
+      body: JSON.stringify({ lesson: { ...lesson, release_challenge_solutions_while_active: true } }),
+    });
+
+    if (!response.ok) {
+      console.error(`Error revealing solutions for ${lesson.title}`, response.statusText);
+    }
+  }
+}
+
 function chooseAssignment(courseSettings: CourseSettings): AssignmentSettings {
   for (const [i, assignment] of courseSettings.assignments.entries()) {
     console.log(i, assignment.edNameSuffix);
@@ -213,22 +298,20 @@ function chooseAssignment(courseSettings: CourseSettings): AssignmentSettings {
   return courseSettings.assignments[n];
 }
 
-async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse): Promise<void> {
-  let assignmentSettings = chooseAssignment(courseSettings);
-
-  let edLessons = await getEdLessons(edToken, edCourse);
+async function extractQuestionsForAssignment(
+  assignmentSettings: AssignmentSettings,
+  edLessons: EdLesson[],
+): Promise<string> {
   let edLesson = await getEdLessonDetails(edToken, assignmentSettings.edNameSuffix, edLessons);
   let slide = edLesson.slides.find((s) => s.title === "Quiz" && s.type == "quiz");
   if (!slide) {
-    console.log("Couldn't find slide");
-    return;
+    throw new Error("Couldn't find slide");
   }
 
   let results = await getEdSlideResults(edToken, slide);
   let question = results.questions.find((q) => q.data.content.includes("two to three paragraphs"));
   if (!question) {
-    console.log("Couldn't find question");
-    return;
+    throw new Error("Couldn't find question");
   }
 
   let qid = question.id;
@@ -271,31 +354,52 @@ async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse):
       studentQuestions += ` ${answer.user_name}'s reflection is too short: ` + wc + " " + answer.data + " ";
     }
     studentQuestions += response + " ";
-    await fs.writeFile("questions.txt", studentQuestions);
   }
+
+  return studentQuestions;
+}
+
+async function getQuestions(courseSettings: CourseSettings, edCourse: EdCourse): Promise<void> {
+  let assignmentSettings = chooseAssignment(courseSettings);
+  let edLessons = await getEdLessons(edToken, edCourse);
+  let studentQuestions = await extractQuestionsForAssignment(assignmentSettings, edLessons);
+  await fs.writeFile("questions.txt", studentQuestions);
+}
+
+function findCanvasAssignment(
+  canvasAssignments: CanvasAssignment[],
+  assignmentSettings: AssignmentSettings,
+): CanvasAssignment | undefined {
+  for (let ass of canvasAssignments) {
+    if (assignmentSettings.canvasNameExact === ass.name) {
+      return ass;
+    }
+    if (assignmentSettings.canvasNamePrefix && ass.name.startsWith(assignmentSettings.canvasNamePrefix)) {
+      return ass;
+    }
+  }
+  return undefined;
 }
 
 async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCourse, canvasCourse: CanvasCourse) {
   let assignmentSettings = chooseAssignment(courseSettings);
-  let canvasAssignments = await getCanvasAssignments(canvasToken, canvasCourse);
-  let canvasAssignment;
-  for (let ass of canvasAssignments) {
-    if (assignmentSettings.canvasNameExact === ass.name) {
-      canvasAssignment = ass;
-      break;
-    }
-    if (assignmentSettings.canvasNamePrefix && ass.name.startsWith(assignmentSettings.canvasNamePrefix)) {
-      canvasAssignment = ass;
-      break;
-    }
-  }
+  let canvasAssignments = await getCanvasAssignments(canvasCourse);
+  let canvasAssignment = findCanvasAssignment(canvasAssignments, assignmentSettings);
   if (!canvasAssignment) {
-    throw new Error("Couldn't find canvas assignment for " + assignmentSettings);
+    throw new Error("Couldn't find canvas assignment for " + assignmentSettings.edNameSuffix);
   }
 
-  // TODO: Fetch lessons once.  Rework this?
-  // TODO: Break up long functions
   let edLessons = await getEdLessons(edToken, edCourse);
+  await gradeOneAssignment(edCourse, canvasCourse, canvasAssignment, assignmentSettings, edLessons);
+}
+
+async function gradeOneAssignment(
+  edCourse: EdCourse,
+  canvasCourse: CanvasCourse,
+  canvasAssignment: CanvasAssignment,
+  assignmentSettings: AssignmentSettings,
+  edLessons: EdLesson[],
+): Promise<void> {
   let edLesson = await getEdLessonDetails(edToken, assignmentSettings.edNameSuffix, edLessons);
 
   console.log("Getting lesson results...");
@@ -345,7 +449,7 @@ async function gradeAssignments(courseSettings: CourseSettings, edCourse: EdCour
     }
     let grade = r.MARK - penalty;
     console.log(`Assigning grade of ${grade} to ${r.NAME}`, comment);
-    await assignCanvasGrade(canvasToken, canvasCourse, canvasAssignment, canvasStudent, grade, comment, lessonDaysLate);
+    await assignCanvasGrade(canvasCourse, canvasAssignment, canvasStudent, grade, comment, lessonDaysLate);
   }
 }
 
@@ -362,7 +466,7 @@ async function loadCourseSettings(): Promise<Map<string, CourseSettings>> {
   return dueDates;
 }
 
-async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, canvasCourse: CanvasCourse) {
+function checkRoster(edCourse: EdCourse, canvasCourse: CanvasCourse): void {
   let missingStudents = [];
   for (let canvasStudent of canvasCourse.students.values()) {
     let es = edCourse.students.get(canvasStudent.name);
@@ -373,10 +477,27 @@ async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, can
   if (missingStudents.length > 0) {
     throw new Error("Couldn't find ed students for " + missingStudents);
   }
+}
+
+function findCourseSettings(
+  allCourseSettings: Map<string, CourseSettings>,
+  edCourse: EdCourse,
+): CourseSettings | undefined {
+  for (const [name, cs] of allCourseSettings.entries()) {
+    if (edCourse.code.includes(name)) {
+      return cs;
+    }
+  }
+  return undefined;
+}
+
+async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, canvasCourse: CanvasCourse) {
+  checkRoster(edCourse, canvasCourse);
 
   while (true) {
     console.log("1. Grade assignments");
     console.log("2. Get reflection questions");
+    console.log("R. Reveal exercise solutions");
     console.log("S. Set up course");
     console.log("X. Go Back\n");
     let choice = prompt("Your choice? ");
@@ -388,6 +509,10 @@ async function useCourse(courseSettings: CourseSettings, edCourse: EdCourse, can
           break;
         case "2":
           await getQuestions(courseSettings, edCourse);
+          break;
+        case "r":
+        case "R":
+          await revealExerciseSolutions(edCourse);
           break;
         case "s":
         case "S":
@@ -411,12 +536,231 @@ async function loadCourseMapping(): Promise<any> {
   }
 }
 
+function isHwAssignment(assignmentSettings: AssignmentSettings): boolean {
+  return /^HW \d+$/.test(assignmentSettings.edNameSuffix);
+}
+
+function confirm(message: string): boolean {
+  return prompt(`${message} Proceed? [y/N] `)?.toLowerCase() === "y";
+}
+
+async function autoGradeAssignment(
+  edCourse: EdCourse,
+  canvasCourse: CanvasCourse,
+  assignmentSettings: AssignmentSettings,
+  edLessons: EdLesson[],
+): Promise<void> {
+  let canvasAssignments = await getCanvasAssignments(canvasCourse);
+  let canvasAssignment = findCanvasAssignment(canvasAssignments, assignmentSettings);
+  if (!canvasAssignment) {
+    console.log(`${edCourse.code}: couldn't find canvas assignment for ${assignmentSettings.edNameSuffix}, skipping`);
+    return;
+  }
+
+  if (await isAssignmentGraded(canvasCourse, canvasAssignment)) {
+    console.log(`${edCourse.code} ${assignmentSettings.edNameSuffix}: already graded, skipping`);
+    return;
+  }
+
+  if (!confirm(`Grade ${edCourse.code} ${assignmentSettings.edNameSuffix} (Canvas: ${canvasAssignment.name}).`)) {
+    console.log("Skipped");
+    return;
+  }
+
+  await gradeOneAssignment(edCourse, canvasCourse, canvasAssignment, assignmentSettings, edLessons);
+}
+
+function courseNumFor(edCourse: EdCourse): string | undefined {
+  if (edCourse.code.includes("311")) return "311";
+  if (edCourse.code.includes("611")) return "611";
+  return undefined;
+}
+
+async function loadHistoricalQA(courseNum: string, hwNumber: string): Promise<string> {
+  const dir = `questions/${courseNum}/${hwNumber}`;
+  let files: string[];
+  try {
+    files = await fs.readdir(dir);
+  } catch {
+    return "";
+  }
+
+  let samples = "";
+  for (const file of files) {
+    if (!file.endsWith(".txt")) continue;
+    samples += (await fs.readFile(`${dir}/${file}`, "utf8")) + "\n\n";
+  }
+  return samples;
+}
+
+async function generateAnswers(
+  edCourse: EdCourse,
+  assignmentSettings: AssignmentSettings,
+  rawQuestions: string,
+): Promise<string> {
+  const courseNum = courseNumFor(edCourse);
+  const hwMatch = assignmentSettings.edNameSuffix.match(/^HW (\d+)$/);
+  const hwNumber = hwMatch?.[1];
+
+  const samples = courseNum && hwNumber ? await loadHistoricalQA(courseNum, hwNumber) : "";
+
+  const prompt =
+    `${QA_ANSWER_PROMPT_HEADER}\n\n${samples || "(No past answers on file for this assignment.)"}` +
+    `\n\n---\n\nNow here are this week's raw extracted student reflections to process. Apply the rules ` +
+    `above (clean up noise, drop padding for short reflections, ignore no-question notices) and produce ` +
+    `your answer document for these new questions only — do not repeat or re-answer the calibration ` +
+    `examples above:\n\n${rawQuestions}`;
+
+  const anthropic = new Anthropic({ apiKey: anthropicKey });
+  const message = await anthropic.messages.create({
+    model: "claude-opus-4-8",
+    max_tokens: 8192,
+    thinking: { type: "adaptive" },
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const textBlock = message.content.find((block) => block.type === "text");
+  return textBlock?.type === "text" ? textBlock.text : "";
+}
+
+function markdownToEdDocument(markdown: string): string {
+  const paragraphs = markdown.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  return paragraphs
+    .map((paragraph) => {
+      const inner = paragraph
+        .split(/(\*\*[^*]+\*\*)/g)
+        .map((part) => {
+          const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
+          return boldMatch ? `<bold>${encode(boldMatch[1])}</bold>` : encode(part);
+        })
+        .join("");
+      return `<paragraph>${inner}</paragraph>`;
+    })
+    .join("");
+}
+
+async function autoPostQuestions(
+  edCourse: EdCourse,
+  assignmentSettings: AssignmentSettings,
+  edLessons: EdLesson[],
+): Promise<void> {
+  const title = `${assignmentSettings.edNameSuffix} Questions`;
+
+  const drafts = await listThreadDrafts(edToken, edCourse);
+  if (drafts.some((d) => d.title === title)) {
+    console.log(`${edCourse.code}: draft "${title}" already exists, skipping`);
+    return;
+  }
+
+  const posts = await listDiscussionPosts(edToken, edCourse);
+  if (posts.some((p) => p.title === title)) {
+    console.log(`${edCourse.code}: "${title}" already posted, skipping`);
+    return;
+  }
+
+  if (!confirm(`Post "${title}" draft thread for ${edCourse.code}.`)) {
+    console.log("Skipped");
+    return;
+  }
+
+  const rawQuestions = await extractQuestionsForAssignment(assignmentSettings, edLessons);
+  console.log("Generating draft answers with Claude...");
+  const answers = await generateAnswers(edCourse, assignmentSettings, rawQuestions);
+  const body = markdownToEdDocument(answers);
+  await createThreadDraft(edToken, edCourse, title, body);
+}
+
+async function autoSweepCourse(
+  courseSettings: CourseSettings,
+  edCourse: EdCourse,
+  canvasCourse: CanvasCourse,
+): Promise<void> {
+  checkRoster(edCourse, canvasCourse);
+
+  let edLessons = await getEdLessons(edToken, edCourse);
+  let now = new Date();
+
+  for (let assignmentSettings of courseSettings.assignments) {
+    try {
+      let edLesson: EdLesson;
+      try {
+        edLesson = await getEdLessonDetails(edToken, assignmentSettings.edNameSuffix, edLessons);
+      } catch {
+        console.log(`${edCourse.code}: couldn't find lesson ${assignmentSettings.edNameSuffix}, skipping`);
+        continue;
+      }
+
+      if (!edLesson.due_at) {
+        console.log(`${edCourse.code} ${assignmentSettings.edNameSuffix}: no due date set, skipping`);
+        continue;
+      }
+
+      let dropDead = new Date(edLesson.due_at);
+      dropDead.setDate(dropDead.getDate() + GRADING_DROP_DEAD_DAYS);
+      if (now < dropDead) {
+        continue;
+      }
+
+      await autoGradeAssignment(edCourse, canvasCourse, assignmentSettings, edLessons);
+
+      if (isHwAssignment(assignmentSettings)) {
+        await autoPostQuestions(edCourse, assignmentSettings, edLessons);
+      }
+    } catch (ex) {
+      console.log(`${edCourse.code} ${assignmentSettings.edNameSuffix}: error`, ex);
+    }
+  }
+}
+
+async function autoSweep(
+  allCourseSettings: Map<string, CourseSettings>,
+  edCourses: EdCourse[],
+  canvasCourses: CanvasCourse[],
+  courseMapping: any,
+): Promise<void> {
+  for (let edCourse of edCourses) {
+    if (courseMapping[edCourse.code]) continue;
+
+    console.log(`No Canvas mapping for ${edCourse.code}.`);
+    for (const [i, course] of canvasCourses.entries()) {
+      console.log(i, course.name);
+    }
+    let n = Number(prompt(`Canvas course for ${edCourse.code}? `));
+    let canvasCourse = canvasCourses[n];
+    courseMapping[edCourse.code] = canvasCourse.name;
+    await fs.writeFile("course-mapping.json", JSON.stringify(courseMapping));
+  }
+
+  for (let edCourse of edCourses) {
+    let courseSettings = findCourseSettings(allCourseSettings, edCourse);
+    if (!courseSettings) {
+      console.log(`Couldn't find settings for ${edCourse.code}, skipping auto-sweep`);
+      continue;
+    }
+
+    let canvasCourseName = courseMapping[edCourse.code];
+    let canvasCourse = canvasCourses.find((c) => c.name === canvasCourseName);
+    if (!canvasCourse) {
+      console.log(`Couldn't find canvas course "${canvasCourseName}" for ${edCourse.code}, skipping`);
+      continue;
+    }
+
+    console.log(`\nAuto-sweeping ${edCourse.code}...`);
+    try {
+      await autoSweepCourse(courseSettings, edCourse, canvasCourse);
+    } catch (ex) {
+      console.log(`${edCourse.code}: error during auto-sweep`, ex);
+    }
+  }
+}
+
 async function main() {
   let allCourseSettings = await loadCourseSettings();
   let secrets = JSON.parse((await fs.readFile("secrets.json")).toString());
   edToken = await getEdToken(secrets["ed-user"], secrets["ed-password"]);
-  canvasToken = secrets["canvas-token"];
+  setCanvasSession(await ensureCanvasSession());
   openAIKey = secrets["openai-key"];
+  anthropicKey = secrets["anthropic-key"];
 
   var edCourses = await getEdCourses(
     edToken,
@@ -431,9 +775,11 @@ async function main() {
   );
 
   console.log("loading canvas courses");
-  var canvasCourses = await getCanvasCourses(canvasToken);
+  var canvasCourses = await getCanvasCourses();
   console.log("loading canvas courses done");
   var courseMapping = await loadCourseMapping();
+
+  await autoSweep(allCourseSettings, edCourses, canvasCourses, courseMapping);
 
   while (true) {
     for (const [i, course] of edCourses.entries()) {
@@ -465,13 +811,7 @@ async function main() {
       await fs.writeFile("course-mapping.json", JSON.stringify(courseMapping));
     }
 
-    let courseSettings: CourseSettings | undefined = undefined;
-    for (const [name, cs] of allCourseSettings.entries()) {
-      if (edCourse.code.includes(name)) {
-        courseSettings = cs;
-        break;
-      }
-    }
+    let courseSettings = findCourseSettings(allCourseSettings, edCourse);
 
     if (!courseSettings) {
       console.log(`Couldn't find settings for ${edCourse.code}`);

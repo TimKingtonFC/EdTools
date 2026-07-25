@@ -93,6 +93,11 @@ export interface EdThread {
   user: EdUser;
 }
 
+export interface EdThreadDraft {
+  id: number;
+  title: string;
+}
+
 export async function getEdToken(user: string, password: string): Promise<string> {
   const response = await fetch("https://us.edstem.org/api/token", {
     method: "POST",
@@ -215,8 +220,13 @@ export async function getEdSlideResults(token: string, slide: EdSlide): Promise<
   return data.results;
 }
 
-export async function postThread(token: string, course: EdCourse, title: string, body: string, date: Date) {
-  let response = await fetch("https://us.edstem.org/api/courses/" + course.id + "/thread_drafts", {
+export async function createThreadDraft(
+  token: string,
+  course: EdCourse,
+  title: string,
+  body: string,
+): Promise<EdThreadDraft> {
+  const response = await fetch("https://us.edstem.org/api/courses/" + course.id + "/thread_drafts", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -239,12 +249,29 @@ export async function postThread(token: string, course: EdCourse, title: string,
       },
     }),
   });
-  const draft = (await response.json()) as { thread_draft: { id: number } };
-  const threadId = draft.thread_draft.id;
+  const data = (await response.json()) as { thread_draft: EdThreadDraft };
+  if (!response.ok) {
+    console.error("Error creating thread draft", response.statusText);
+  }
+  return data.thread_draft;
+}
 
-  response = await fetch(
+export async function listThreadDrafts(token: string, course: EdCourse): Promise<EdThreadDraft[]> {
+  const response = await fetch(`https://us.edstem.org/api/courses/${course.id}/thread_drafts`, {
+    headers: {
+      "x-token": token,
+    },
+  });
+  const data = (await response.json()) as { thread_drafts: EdThreadDraft[] };
+  return data.thread_drafts;
+}
+
+export async function postThread(token: string, course: EdCourse, title: string, body: string, date: Date) {
+  const threadDraft = await createThreadDraft(token, course, title, body);
+
+  let response = await fetch(
     "https://us.edstem.org/api/thread_drafts/" +
-      threadId +
+      threadDraft.id +
       "/schedule?send_emails=1&scheduled_time=" +
       date.toISOString(),
     {

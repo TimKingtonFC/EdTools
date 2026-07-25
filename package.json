@@ -2,10 +2,12 @@
   "type": "module",
   "main": "out/index.js",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "csv-parse": "^5.5.2",
     "html-entities": "^2.5.2",
     "node-fetch": "^3.3.0",
     "openai": "^4.12.1",
+    "playwright": "^1.62.0",
     "prompt-sync": "^4.2.0"
   },
   "scripts": {

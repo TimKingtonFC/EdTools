@@ -1,4 +1,5 @@
 import fetch, { RequestInfo, RequestInit, Response } from "node-fetch";
+import { CanvasSession } from "./canvasAuth.js";
 
 // TODO: Wrap with module CanvasAPI, remove stuttering
 export interface CanvasCourse {
@@ -22,30 +23,55 @@ export interface CanvasStudent {
 export interface CanvasSubmission {
   id: number;
   user_id: number;
+  workflow_state: string;
+  graded_at: string | null;
 }
 
-async function canvasFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
-  let resp = await fetch(input, init);
-  // let cost = resp.headers.get("x-request-cost");
-  // let remaining = resp.headers.get("x-rate-limit-remaining");
-  // console.log(input, cost, remaining);
+// Auth for every Canvas request. Set once at startup via setCanvasSession().
+let session: CanvasSession | undefined;
 
-  return resp;
+export function setCanvasSession(newSession: CanvasSession): void {
+  session = newSession;
 }
 
-export async function getCanvasCourses(token: string): Promise<CanvasCourse[]> {
-  const response = await canvasFetch("https://franklin.instructure.com/api/v1/courses?per_page=500", {
-    headers: {
-      Authorization: token,
-    },
-  });
-  let courses = (await response.json()) as CanvasCourse[];
+async function canvasFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
+  if (!session) {
+    throw new Error("Canvas session not set - call setCanvasSession() before making requests.");
+  }
+
+  const headers: Record<string, string> = {
+    ...((init.headers as Record<string, string> | undefined) ?? {}),
+    Cookie: session.cookie,
+  };
+
+  // Canvas requires a CSRF token on anything that changes state.
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    headers["X-CSRF-Token"] = session.csrfToken;
+  }
+
+  return await fetch(input, { ...init, headers });
+}
+
+// Parses a JSON response, turning an auth/API failure into a clear error instead
+// of a cryptic "x.filter is not a function" downstream.
+async function readJson<T>(response: Response, what: string): Promise<T> {
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Canvas ${what} request failed (${response.status}): ${body}`);
+  }
+  return (await response.json()) as T;
+}
+
+export async function getCanvasCourses(): Promise<CanvasCourse[]> {
+  const response = await canvasFetch("https://franklin.instructure.com/api/v1/courses?per_page=500");
+  let courses = await readJson<CanvasCourse[]>(response, "courses");
   let oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   courses = courses.filter((course) => new Date(course.end_at) >= oneWeekAgo);
 
   for (let course of courses) {
-    let students = await getCanvasStudents(token, course);
+    let students = await getCanvasStudents(course);
 
     let map = new Map<string, CanvasStudent>();
     for (let edStudent of students) {
@@ -59,61 +85,49 @@ export async function getCanvasCourses(token: string): Promise<CanvasCourse[]> {
 }
 
 // TODO: Get rid of canvas lots of places
-export async function getCanvasAssignments(canvasToken: string, course: CanvasCourse): Promise<CanvasAssignment[]> {
+export async function getCanvasAssignments(course: CanvasCourse): Promise<CanvasAssignment[]> {
   const response = await canvasFetch(
-    `https://franklin.instructure.com/api/v1/courses/${course.id}/assignments?per_page=50`,
-    {
-      headers: {
-        Authorization: canvasToken,
-      },
-    }
+    `https://franklin.instructure.com/api/v1/courses/${course.id}/assignments?per_page=50`
   );
-  let assignments = (await response.json()) as CanvasAssignment[];
-
-  // TODO: Remove
-  // TODO: Reduce requests
-  // for (let assignment of assignments) {
-  //   assignment.submissions = await getCanvasSubmissions(canvasToken, course, assignment);
-  // }
-
-  return assignments;
+  return await readJson<CanvasAssignment[]>(response, "assignments");
 }
 // TODO: Remove?
 export async function getCanvasSubmissions(
-  canvasToken: string,
   course: CanvasCourse,
   assignment: CanvasAssignment
 ): Promise<Map<number, CanvasSubmission>> {
   const response = await canvasFetch(
-    `https://franklin.instructure.com/api/v1/courses/${course.id}/assignments/${assignment.id}/submissions`,
-    {
-      headers: {
-        Authorization: canvasToken,
-      },
-    }
+    `https://franklin.instructure.com/api/v1/courses/${course.id}/assignments/${assignment.id}/submissions`
   );
 
   let subs = new Map<number, CanvasSubmission>();
-  for (let sub of (await response.json()) as CanvasSubmission[]) {
+  for (let sub of await readJson<CanvasSubmission[]>(response, "submissions")) {
     subs.set(sub.user_id, sub);
   }
   return subs;
 }
 
-async function getCanvasStudents(canvasToken: string, course: CanvasCourse): Promise<CanvasStudent[]> {
-  const response = await canvasFetch(
-    `https://franklin.instructure.com/api/v1/courses/${course.id}/users?enrollment_type=student&per_page=50`,
-    {
-      headers: {
-        Authorization: canvasToken,
-      },
+export async function isAssignmentGraded(
+  course: CanvasCourse,
+  assignment: CanvasAssignment
+): Promise<boolean> {
+  const submissions = await getCanvasSubmissions(course, assignment);
+  for (let submission of submissions.values()) {
+    if (submission.workflow_state === "graded") {
+      return true;
     }
+  }
+  return false;
+}
+
+async function getCanvasStudents(course: CanvasCourse): Promise<CanvasStudent[]> {
+  const response = await canvasFetch(
+    `https://franklin.instructure.com/api/v1/courses/${course.id}/users?enrollment_type=student&per_page=50`
   );
-  return (await response.json()) as CanvasStudent[];
+  return await readJson<CanvasStudent[]>(response, "students");
 }
 
 export async function assignCanvasGrade(
-  canvasToken: string,
   course: CanvasCourse,
   assignment: CanvasAssignment,
   student: CanvasStudent,
@@ -149,13 +163,13 @@ export async function assignCanvasGrade(
       method: "PUT",
       headers: {
         "content-type": "application/json",
-        Authorization: canvasToken,
       },
       body: JSON.stringify(body),
     }
   );
 
   if (!response.ok) {
-    console.error("Error setting grade", response.statusText);
+    const errBody = await response.text();
+    console.error("Error setting grade", response.status, errBody);
   }
 }
