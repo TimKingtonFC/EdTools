@@ -35,6 +35,9 @@ import {
 const prompt = promptSync({ sigint: true });
 
 const GRADING_DROP_DEAD_DAYS = 3;
+// Only sweep assignments whose due date is within this many days of now - older
+// ones have already been handled on previous runs.
+const GRADING_MAX_AGE_DAYS = 21;
 
 interface CourseSettings {
   assignments: AssignmentSettings[];
@@ -540,10 +543,6 @@ function isHwAssignment(assignmentSettings: AssignmentSettings): boolean {
   return /^HW \d+$/.test(assignmentSettings.edNameSuffix);
 }
 
-function confirm(message: string): boolean {
-  return prompt(`${message} Proceed? [y/N] `)?.toLowerCase() === "y";
-}
-
 async function autoGradeAssignment(
   edCourse: EdCourse,
   canvasCourse: CanvasCourse,
@@ -562,11 +561,7 @@ async function autoGradeAssignment(
     return;
   }
 
-  if (!confirm(`Grade ${edCourse.code} ${assignmentSettings.edNameSuffix} (Canvas: ${canvasAssignment.name}).`)) {
-    console.log("Skipped");
-    return;
-  }
-
+  console.log(`Grading ${edCourse.code} ${assignmentSettings.edNameSuffix} (Canvas: ${canvasAssignment.name})...`);
   await gradeOneAssignment(edCourse, canvasCourse, canvasAssignment, assignmentSettings, edLessons);
 }
 
@@ -658,11 +653,7 @@ async function autoPostQuestions(
     return;
   }
 
-  if (!confirm(`Post "${title}" draft thread for ${edCourse.code}.`)) {
-    console.log("Skipped");
-    return;
-  }
-
+  console.log(`Posting "${title}" draft thread for ${edCourse.code}...`);
   const rawQuestions = await extractQuestionsForAssignment(assignmentSettings, edLessons);
   console.log("Generating draft answers with Claude...");
   const answers = await generateAnswers(edCourse, assignmentSettings, rawQuestions);
@@ -692,6 +683,12 @@ async function autoSweepCourse(
 
       if (!edLesson.due_at) {
         console.log(`${edCourse.code} ${assignmentSettings.edNameSuffix}: no due date set, skipping`);
+        continue;
+      }
+
+      let threeWeeksAgo = new Date(now);
+      threeWeeksAgo.setDate(threeWeeksAgo.getDate() - GRADING_MAX_AGE_DAYS);
+      if (new Date(edLesson.due_at) < threeWeeksAgo) {
         continue;
       }
 
