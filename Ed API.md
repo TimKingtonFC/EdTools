@@ -119,16 +119,37 @@ const doc = parts => '<document version="2.0">' +
 
 ---
 
-## Code-challenge files (scaffold / solution / test) — the one thing you can't fully script
+## Code-challenge files (scaffold / solution / test)
 
-The three file trees a code challenge grades against are edited in Ed's **workspace container**, which the browser reaches over a boot-time WebSocket. The workspace ID needed to upload a file is **not** in page state, `localStorage`, the challenge object, or any queryable endpoint — it's only handed to the client over that socket, and only surfaces to plain HTTP the moment an actual upload happens. So there is no way to obtain the ID without an upload, and an upload is exactly what sets the file.
+A code challenge grades against three file trees, each edited in an Ed **workspace container** reached over a WebSocket (`wss://sahara.us.edstem.org`). These *are* scriptable — content written this way is committed to the workspace immediately and **survives a page refresh with no "Save" and no `PATCH`**. (The challenge's `scaffold_hash` field is a separate content-addressed pointer; it stayed empty in tests while the content persisted fine, so it isn't what makes the file stick. Setting it directly 500s — ignore it.)
 
-The HTTP upload flow itself (once you somehow hold a live `wid`) is:
-1. `POST /workspaces/{wid}/upload` — JSON `{wid, path:'/home/dummy'}` → `{ticket}`
-2. `POST https://sahara.us.edstem.org/upload/{ticket}` — multipart, field `file` = the file → returns a file hash
-3. Save the challenge — the web client fires `PATCH /challenges/{id}` carrying **tree hashes it computed from the live workspace**. You can't compute those hashes yourself (setting `scaffold_hash` to the upload's file hash 500s).
+Get a connect ticket for the part you want:
+```
+POST /api/challenges/{cid}/connect/{scaffold|solution|testbase}
+  JSON body {"user_id":null,"password":null,"i":null}  →  {"ticket": "..."}
+```
+Open `wss://sahara.us.edstem.org/connect?ticket=<ticket>`. The server's first message is `init`, whose `data.wid` is the workspace id and `data.last_commits` is the workspace's commit history. **The `wid` appears only here — no HTTP response carries it**, so a brief WS connect is the only way to read it.
 
-**Practical consequence:** dropping the scaffold/solution/test files stays a manual step in the Ed UI — drag each file into the Scaffold / Solution / Test tab, then Save. Verify by loading the Solution and clicking Mark. Everything *around* the files (slides, titles, order, questions, description, points, PyUnit config) is scriptable.
+### Option A — direct upload (simplest)
+Once you have the `wid` from `init`, close the socket and upload over plain HTTP:
+1. `POST /api/workspaces/{wid}/upload` — JSON `{wid, path:"/home"}` → `{ticket}`
+2. `POST https://sahara.us.edstem.org/upload/{ticket}` — multipart, field `file`, with the multipart `filename` set to the target name (e.g. `wrangle.py`) → the file lands in `/home` and persists.
+
+No OT ops, no rev, no save. This is the easy path when you're replacing/adding a whole file.
+
+### Option B — edit in place over the WebSocket (operational transform)
+No `wid` needed; work entirely on the connect socket.
+1. send `{"type":"file_open","data":{"path":"/home/<file>","soft":false}}`
+2. receive `file_ot_init` → gives the file's `buffer`, `fid`, and current `rev`
+3. send one op that covers the whole document:
+   `{"type":"file_ot","data":{"fid":<fid>,"op":[{"type":"delete","value":<buffer length>},{"type":"insert","value":"<new content>"}],"rev":<rev>}}`
+   (ops are `skip` / `insert` / `delete`; the `skip`+`delete` counts must sum to the current document length. Partial edits just skip the unchanged spans.)
+4. the server applies it, replies with a `file_ot` carrying `new_rev`, and persists — no explicit save.
+
+### Deleting a stray file
+Upload only writes. To remove a wrong file (e.g. a test file left in the scaffold), send an `fsop` over the connect socket. `{"type":"fsop","data":{"type":"list_folder","param1":"/home"}}` lists the folder (reply `list_reply`); the delete op is the analogous `fsop` (op name not captured here — confirm from a HAR of a UI delete).
+
+**Verify** by reconnecting (`connect/{part}` → WS → `file_open` → read the `file_ot_init` buffer back), or in the UI by loading the Solution and clicking Mark.
 
 ---
 
@@ -206,4 +227,6 @@ await fetch(`${base}/lessons/slides/${quiz.id}/questions`, {method:'POST', heade
 | Add quiz question | `POST /lessons/slides/{s}/questions` | JSON `{question:…}` |
 | Edit quiz question | `PUT /lessons/slides/questions/{id}` | JSON `{question:…}` |
 | Configure code challenge | `PATCH /challenges/{id}` | JSON `{challenge:…}` |
-| Upload a workspace file | `POST /workspaces/{wid}/upload` then `POST sahara …/upload/{ticket}` | JSON, then multipart (manual — see above) |
+| Connect to a workspace | `POST /challenges/{cid}/connect/{scaffold\|solution\|testbase}` → ticket; open `wss://sahara…/connect?ticket=` (`init` gives the `wid`) | JSON, then WS |
+| Set a workspace file (upload) | get `wid` from WS `init`, then `POST /workspaces/{wid}/upload` → `POST sahara…/upload/{ticket}` | JSON, then multipart |
+| Set a workspace file (edit) | on the connect WS: `file_open` → `file_ot` with a full-doc op | WS messages |
